@@ -1,11 +1,47 @@
-version: '3.9'
 services:
-  maku-boot:
-    image: makunet:1.0
-    container_name: maku-boot
-    ports:
-      - 8080:8080
+  # --- 1. MySQL 数据库 (已配置持久化) ---
+  mysql:
+    image: mysql:8.0
+    container_name: maku-mysql
+    restart: always
     environment:
-      - spring.profiles.active=prod
+      MYSQL_ROOT_PASSWORD: Maku@123456
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
     volumes:
-      - /work/www/maku-boot/maku-server.jar:/app/app.jar
+      # 【关键】将容器内的数据目录映射到服务器的 ./mysql-data 文件夹
+      - ./mysql-data:/var/lib/mysql
+    networks:
+      - maku-net
+
+  # --- 2. Redis 缓存 ---
+  redis:
+    image: redis:7-alpine
+    container_name: maku-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - maku-net
+
+
+  # --- 3. 生产环境 Java 应用 (端口 8080) ---
+  app-prod:
+    build: .
+    container_name: maku-app-prod
+    restart: always
+    ports:
+      - "8080:8080"  # 直接映射到 8080，访问方便
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - TZ=Asia/Shanghai
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - maku-net
+
+networks:
+  maku-net:
+    driver: bridge
