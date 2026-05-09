@@ -25,10 +25,38 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: 构建项目(跳过测试)
+      - name: 构建项目
         run: mvn -B clean package -DskipTests
 
-      - name: SSH 部署到服务器
+      - name: 找出构建好的 jar
+        id: find_jar
+        run: |
+          JAR_PATH=$(find . -name "maku-server*.jar" -path "*/target/*" | head -1)
+          echo "找到 jar: $JAR_PATH"
+          echo "jar_path=$JAR_PATH" >> $GITHUB_OUTPUT
+
+      - name: 上传 jar 到服务器
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: ${{ steps.find_jar.outputs.jar_path }}
+          target: /opt/maku-boot/
+          strip_components: 100
+          overwrite: true
+
+      - name: 上传 Dockerfile 和 docker-compose
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "Dockerfile,docker-compose.yml,application-prod.yml"
+          target: /opt/maku-boot/
+          overwrite: true
+
+      - name: SSH 重启容器
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -39,13 +67,14 @@ jobs:
             set -e
             cd /opt/maku-boot
             
-            echo "===== 拉取最新代码 ====="
-            git fetch origin main
-            git reset --hard origin/main
+            # 把上传的 jar 重命名成 docker-compose 期望的名字
+            ls -la *.jar
+            mv maku-server-*.jar maku-server.jar 2>/dev/null || true
             
-            echo "===== 重启容器 ====="
-            docker-compose down
-            docker-compose up -d --build
+            echo "===== 重启 app-prod 容器(保留 mysql/redis) ====="
+            docker-compose stop app-prod
+            docker-compose rm -f app-prod
+            docker-compose up -d --build app-prod
             
             echo "===== 等待服务就绪 ====="
             for i in $(seq 1 30); do
