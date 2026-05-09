@@ -43,7 +43,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: ${{ steps.find_jar.outputs.jar_path }}
           target: /opt/maku-boot/
-          strip_components: 2  # ← 改成 2,去掉 maku-server/target 这两层
+          strip_components: 3  # ← 改成 3,去掉 ./maku-server/target 这三层
           overwrite: true
 
       - name: 上传 Dockerfile 和 docker-compose
