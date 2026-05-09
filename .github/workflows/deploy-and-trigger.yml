@@ -87,7 +87,7 @@ jobs:
               sleep 5
             done
             echo "❌ Maku 启动超时"
-            docker-compose logs --tail=50 app-prod
+            docker compose logs --tail=50 app-prod
             exit 1
 
       - name: 触发 ReqMakuTest 跑回归测试

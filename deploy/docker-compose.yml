@@ -5,7 +5,7 @@ services:
     container_name: maku-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: Maku@123456
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       TZ: Asia/Shanghai
     ports:
       - "3306:3306"
