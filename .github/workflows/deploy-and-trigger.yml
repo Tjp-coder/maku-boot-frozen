@@ -73,9 +73,9 @@ jobs:
             mv maku-server-*.jar maku-server.jar 2>/dev/null || true
             
             echo "===== 重启 app-prod 容器(保留 mysql/redis) ====="
-            docker-compose stop app-prod
-            docker-compose rm -f app-prod
-            docker-compose up -d --build app-prod
+            docker compose stop app-prod
+            docker compose rm -f app-prod
+            docker compose up -d --build app-prod
             
             echo "===== 等待服务就绪 ====="
             for i in $(seq 1 30); do
