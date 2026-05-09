@@ -43,7 +43,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: ${{ steps.find_jar.outputs.jar_path }}
           target: /opt/maku-boot/
-          strip_components: 100
+          strip_components: 2
           overwrite: true
 
       - name: 上传 Dockerfile 和 docker-compose
