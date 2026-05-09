@@ -1,0 +1,75 @@
+name: 构建部署 + 触发回归测试
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+  workflow_dispatch:
+
+jobs:
+  build-deploy-trigger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 构建项目(跳过测试)
+        run: mvn -B clean package -DskipTests
+
+      - name: SSH 部署到服务器
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd /opt/maku-boot
+            
+            echo "===== 拉取最新代码 ====="
+            git fetch origin main
+            git reset --hard origin/main
+            
+            echo "===== 重启容器 ====="
+            docker-compose down
+            docker-compose up -d --build
+            
+            echo "===== 等待服务就绪 ====="
+            for i in $(seq 1 30); do
+              if curl -sf -o /dev/null http://localhost:8080/sys/auth/captcha; then
+                echo "✅ Maku 已就绪"
+                exit 0
+              fi
+              echo "等待中... ($i/30)"
+              sleep 5
+            done
+            echo "❌ Maku 启动超时"
+            docker-compose logs --tail=50 app-prod
+            exit 1
+
+      - name: 触发 ReqMakuTest 跑回归测试
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          repository: Tjp-coder/ReqMakuTest
+          event-type: maku-deployed
+          client-payload: |
+            {
+              "trigger": "maku-boot-push",
+              "commit_sha": "${{ github.sha }}",
+              "commit_message": "${{ github.event.head_commit.message }}",
+              "pusher": "${{ github.actor }}"
+            }
